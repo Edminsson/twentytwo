@@ -1,8 +1,9 @@
-import {Component, computed, inject, signal} from '@angular/core';
+import {afterNextRender, Component, computed, ElementRef, inject, signal, viewChild} from '@angular/core';
 import { form, FormField } from '@angular/forms/signals';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import {MatButtonModule} from '@angular/material/button';
 import {
+  MAT_DIALOG_DATA,
   MatDialog,
   MatDialogActions,
   MatDialogClose,
@@ -26,8 +27,8 @@ interface Movie {
 export class Dialogen {
   readonly dialog = inject(MatDialog);
 
-  openDialog() {
-    this.dialog.open(DialogElementsExampleDialog);
+  openDialog(data: Partial<Movie> = { genre: 'Drama', country: '' }) {
+    this.dialog.open(DialogElementsExampleDialog, { data, autoFocus: false });
   }
 }
 
@@ -42,8 +43,9 @@ export class Dialogen {
           <mat-label>Genre</mat-label>
           <input type="text" 
                 placeholder="Pick one" 
-                aria-label="Genre" 
-                matInput 
+                aria-label="Genre"
+                matInput
+                #genreInput
                 [formField]="form.genre"
                 [matAutocomplete]="auto">
           <mat-autocomplete autoActiveFirstOption #auto="matAutocomplete">
@@ -57,8 +59,9 @@ export class Dialogen {
           <mat-label>Country</mat-label>
           <input type="text" 
                 placeholder="Pick one" 
-                aria-label="Country" 
-                matInput 
+                aria-label="Country"
+                matInput
+                #countryInput
                 [formField]="form.country"
                 [matAutocomplete]="auto2">
           <mat-autocomplete autoActiveFirstOption #auto2="matAutocomplete">
@@ -86,8 +89,26 @@ export class Dialogen {
   ],
 })
 export class DialogElementsExampleDialog {
-  private movieModel = signal<Movie>({ genre: '', country: '' });
+  private _options = ['Comedy', 'Drama', 'Action'] as const;
+  private _countries = ['USA', 'UK', 'France'] as const;
+
+  private data = inject<Partial<Movie> | null>(MAT_DIALOG_DATA, { optional: true });
+  private initialGenre = this._findOption(this._options, this.data?.genre);
+  private initialCountry = this._findOption(this._countries, this.data?.country);
+
+  private countryInput = viewChild.required<ElementRef<HTMLInputElement>>('countryInput');
+  private genreInput = viewChild.required<ElementRef<HTMLInputElement>>('genreInput');
+
+  private movieModel = signal<Movie>({ genre: this.initialGenre, country: this.initialCountry });
   protected form = form(this.movieModel);
+
+  constructor() {
+    // The dialog's own autofocus is disabled (autoFocus: false), so focus the right field here.
+    afterNextRender(() => {
+      const input = this.initialGenre ? this.countryInput() : this.genreInput();
+      input.nativeElement.focus();
+    });
+  }
 
   protected filteredGenreOptions = computed<string[]>(() => {
     const formValue = this.form().value().genre;
@@ -99,19 +120,28 @@ export class DialogElementsExampleDialog {
     return this._filterCountry(formValue);
   });
 
-  private _options = ['Comedy', 'Drama', 'Action'] as const;
-  private _countries = ['USA', 'UK', 'France'] as const;
+  // Returns the canonical option matching value (case-insensitive), or '' if there is none.
+  private _findOption(options: readonly string[], value: string | undefined): string {
+    const filterValue = value?.toLowerCase();
+    return options.find(option => option.toLowerCase() === filterValue) ?? '';
+  }
 
-  private _filterGenre(value: string): string[] {
+  // When the value is already a full selection, show every option so it can be changed.
+  private _filter(options: readonly string[], value: string): string[] {
+    if (this._findOption(options, value)) {
+      return [...options];
+    }
     const filterValue = value.toLowerCase();
 
-    return this._options.filter(option => option.toLowerCase().includes(filterValue));
+    return options.filter(option => option.toLowerCase().includes(filterValue));
+  }
+
+  private _filterGenre(value: string): string[] {
+    return this._filter(this._options, value);
   }
 
   private _filterCountry(value: string): string[] {
-    const filterValue = value.toLowerCase();
-
-    return this._countries.filter(option => option.toLowerCase().includes(filterValue));
+    return this._filter(this._countries, value);
   }
 
 }
