@@ -1,6 +1,6 @@
 import {afterNextRender, Component, computed, ElementRef, inject, signal, viewChild} from '@angular/core';
 import { form, FormField } from '@angular/forms/signals';
-import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatAutocomplete, MatAutocompleteModule } from '@angular/material/autocomplete';
 import {MatButtonModule} from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -48,7 +48,8 @@ export class Dialogen {
                 #genreInput
                 [formField]="form.genre"
                 [matAutocomplete]="auto">
-          <mat-autocomplete autoActiveFirstOption #auto="matAutocomplete">
+          <mat-autocomplete autoActiveFirstOption #auto="matAutocomplete"
+                            (opened)="markSelected(auto, form.genre().value())">
             @for (option of filteredGenreOptions(); track option) {
               <mat-option [value]="option">{{option}}</mat-option>
             }
@@ -64,7 +65,8 @@ export class Dialogen {
                 #countryInput
                 [formField]="form.country"
                 [matAutocomplete]="auto2">
-          <mat-autocomplete autoActiveFirstOption #auto2="matAutocomplete">
+          <mat-autocomplete autoActiveFirstOption #auto2="matAutocomplete"
+                            (opened)="markSelected(auto2, form.country().value())">
             @for (option of filteredCountryOptions(); track option) {
               <mat-option [value]="option">{{option}}</mat-option>
             }
@@ -119,6 +121,16 @@ export class DialogElementsExampleDialog {
     const formValue = this.form().value().country;
     return this._filterCountry(formValue);
   });
+
+  // A value set programmatically (e.g. preselected) is not marked as selected by the autocomplete,
+  // so mark the matching option when the panel opens to show its check mark.
+  protected markSelected(autocomplete: MatAutocomplete, value: string): void {
+    autocomplete.options.forEach(option => {
+      if (option.value === value && !option.selected) {
+        option.select(false);
+      }
+    });
+  }
 
   // Returns the canonical option matching value (case-insensitive), or '' if there is none.
   private _findOption(options: readonly string[], value: string | undefined): string {
